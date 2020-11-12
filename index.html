@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Video Syncer</title>
+		<style>
+			.video {
+				background-color: #000;
+				margin: 1rem 0;
+				width: 49.5%;
+				height: auto;
+			}
+			#left-video {
+				margin-right: 0.5%
+			}
+		</style>
+	</head>
+	<body>
+		<form id="meta-controls-form">
+			<label>Left video source: <input id="left-input" type="text" required></label><br>	
+			<label>Right video source: <input id="right-input" type="text" required></label><br>
+			<input type="submit" value="Submit">
+		</form>
+		<br>
+		<div id="video-controls">
+			<form id="playback-rate-form">
+				<label>Playback Rate: <input id="playback-rate-input" type="number" min="0.25" max="4" step="0.01" required></label>
+				<input type="submit" value="Submit">
+			</form>
+		</div>
+		<video id="left-video" class="video" controls width="960" height="540"></video>
+		<video id="right-video" class="video" controls width="960" height="540"></video>
+		<script>
+			"use strict";
+			var leftVideo = document.getElementById("left-video");
+			var rightVideo = document.getElementById("right-video");
+			var leftInput = document.getElementById("left-input");
+			var rightInput = document.getElementById("right-input");
+			var playbackRateInput = document.getElementById("playback-rate-input");
+			function pause(){
+				if(!leftVideo.paused) {
+					leftVideo.pause();
+				}
+				if(!rightVideo.paused){
+					rightVideo.pause();
+				}
+			}
+			function play(){
+				if(wait){
+					return;
+				}
+				if(leftVideo.paused) {
+					leftVideo.play();
+				}
+				if(rightVideo.paused){
+					rightVideo.play();
+				}
+			}
+			var syncId;
+			var wait = false;
+			function completeSync(){
+				if(leftVideo.readyState == 4 && rightVideo.readyState == 4){
+					wait = false;
+					clearInterval(syncId);
+					play();
+				}
+			}
+			function sync(e){
+				console.log("synching");
+				if(wait){
+					return;
+				}
+				pause();
+				let master = e.target;
+				let slave = master == leftVideo ? rightVideo : leftVideo;
+				let masterTime = master.currentTime;
+				let slaveTime = slave.currentTime;
+				if(Math.abs(masterTime - slaveTime) < 0.01){
+					return;
+				}
+				slave.currentTime = masterTime;
+				wait = true;
+				syncId = setInterval(completeSync, 1000);
+			}
+			function setPlaybackRate(rate) {
+				leftVideo.playbackRate = rate;
+				rightVideo.playbackRate = rate;
+			}
+			leftVideo.addEventListener("pause", pause);
+			rightVideo.addEventListener("pause", pause);
+			leftVideo.addEventListener("play", play);
+			rightVideo.addEventListener("play", play);
+			leftVideo.addEventListener("seeked", sync);
+			rightVideo.addEventListener("seeked", sync);
+			document.getElementById("playback-rate-form").addEventListener("submit", function(e){
+				e.preventDefault();
+				setPlaybackRate(playbackRateInput.value);
+			});
+			document.getElementById("meta-controls-form").addEventListener("submit", function(e){
+				e.preventDefault();
+				leftVideo.src = leftInput.value;
+				rightVideo.src = rightInput.value;
+			});
+		</script>
+	</body>
+</html>
