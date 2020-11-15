@@ -3,21 +3,28 @@
 	<head>
 		<title>Video Syncer</title>
 		<style>
+			#videos-container {
+				display: flex;
+				justify-content: space-between;
+			}
+			.video-container {
+				display: inline-block;
+				width: 49%;
+			}
 			.video {
 				background-color: #000;
-				margin: 1rem 0;
-				width: 49.5%;
+				width: 100%;
 				height: auto;
 			}
-			#left-video {
-				margin-right: 0.5%
+			.video-header {
+				width: 100%;
 			}
 		</style>
 	</head>
 	<body>
 		<form id="meta-controls-form">
-			<label>Left video source: <input id="left-input" type="text" required></label><br>	
-			<label>Right video source: <input id="right-input" type="text" required></label><br>
+			<label>Master video source: <input id="master-input" type="text" required></label><br>	
+			<label>Slave video source: <input id="slave-input" type="text" required></label><br>
 			<input type="submit" value="Submit">
 		</form>
 		<br>
@@ -27,78 +34,114 @@
 				<input type="submit" value="Submit">
 			</form>
 		</div>
-		<video id="left-video" class="video" controls width="960" height="540"></video>
-		<video id="right-video" class="video" controls width="960" height="540"></video>
+		<div id="videos-container">
+			<span id="master-video-container" class="video-container">
+				<h3 class="video-header">Master</h3> 
+				<video id="master-video" class="video" src="https://encoded-bongo-ca-youseeu-com.s3.amazonaws.com/i-18252/educator/_228880/973632-1605013116_2a241cb50a80586b4ac7903a3983d663/__228880_2f3c89ef8a30413abc060fe0f9a596fd_screenshare.mp4" controls width="960" height="540"></video>
+			</span>
+			<span id="master-video-container" class="video-container">
+				<h3 class="video-header">Slave</h3>
+				<video id="slave-video" class="video" src="https://encoded-bongo-ca-youseeu-com.s3.amazonaws.com/i-18252/educator/_228880/973632-1605013116_2a241cb50a80586b4ac7903a3983d663/__228880_2f3c89ef8a30413abc060fe0f9a596fd.mp4" controls width="960" height="540"></video>
+			</span>
+		</div>
 		<script>
 			"use strict";
-			var leftVideo = document.getElementById("left-video");
-			var rightVideo = document.getElementById("right-video");
-			var leftInput = document.getElementById("left-input");
-			var rightInput = document.getElementById("right-input");
+			var masterVideo = document.getElementById("master-video");
+			var slaveVideo = document.getElementById("slave-video");
+			var masterInput = document.getElementById("master-input");
+			var slaveInput = document.getElementById("slave-input");
 			var playbackRateInput = document.getElementById("playback-rate-input");
+			var paused = true;
+			//var interrupted = false;
 			function pause(){
-				if(!leftVideo.paused) {
-					leftVideo.pause();
+				before = 0;
+				//interrupted = true;
+				if(!masterVideo.paused) {
+					masterVideo.pause();
 				}
-				if(!rightVideo.paused){
-					rightVideo.pause();
+				if(!slaveVideo.paused){
+					slaveVideo.pause();
 				}
 			}
 			function play(){
-				if(wait){
+				if(isWaiting){
+					pause();
 					return;
 				}
-				if(leftVideo.paused) {
-					leftVideo.play();
+				before = 0;
+				if(masterVideo.paused) {
+					masterVideo.play();
 				}
-				if(rightVideo.paused){
-					rightVideo.play();
-				}
-			}
-			var syncId;
-			var wait = false;
-			function completeSync(){
-				if(leftVideo.readyState == 4 && rightVideo.readyState == 4){
-					wait = false;
-					clearInterval(syncId);
-					play();
+				if(slaveVideo.paused){
+					slaveVideo.play();
 				}
 			}
-			function sync(e){
-				console.log("synching");
-				if(wait){
-					return;
-				}
+			var syncId = 0;
+			var isWaiting = false;
+			function wait() {
+				isWaiting = true;
 				pause();
-				let master = e.target;
-				let slave = master == leftVideo ? rightVideo : leftVideo;
-				let masterTime = master.currentTime;
-				let slaveTime = slave.currentTime;
-				if(Math.abs(masterTime - slaveTime) < 0.01){
+				syncId = setInterval(stopWating, 100);
+			}
+			function stopWating(){
+				if(masterVideo.readyState == 4 && slaveVideo.readyState == 4){
+					isWaiting = false;
+					play();
+					clearInterval(syncId);
+				}
+			}
+			function sync(){
+				console.log("synching");
+				if(isWaiting){
 					return;
 				}
-				slave.currentTime = masterTime;
-				wait = true;
-				syncId = setInterval(completeSync, 1000);
+				let masterTime = masterVideo.currentTime;
+				let slaveTime = slaveVideo.currentTime;
+				let delta = masterTime - slaveTime;
+				if(Math.abs(delta) < 1){
+					return;
+				}
+				before = 0;
+				slaveVideo.currentTime = masterTime;
+				if(!paused){
+					wait();
+				}
 			}
-			function setPlaybackRate(rate) {
-				leftVideo.playbackRate = rate;
-				rightVideo.playbackRate = rate;
-			}
-			leftVideo.addEventListener("pause", pause);
-			rightVideo.addEventListener("pause", pause);
-			leftVideo.addEventListener("play", play);
-			rightVideo.addEventListener("play", play);
-			leftVideo.addEventListener("seeked", sync);
-			rightVideo.addEventListener("seeked", sync);
+			masterVideo.addEventListener("pause", function(){
+				paused = true;
+				pause();
+			});
+			masterVideo.addEventListener("play", function(){
+				paused = false;
+				play();
+			});
+			masterVideo.addEventListener("seeked", sync);
+			setInterval(sync, 20000);
+			var before = 0;
+			var beforeVideo = 0;
+			var playbackRate = 0;
+			/*
+			setInterval(function() {
+				if(!interrupted && before && !masterVideo.paused && !slaveVideo.paused){
+					let rate = (masterVideo.currentTime - beforeVideo) * 1000 / (performance.now() - before);
+					console.log(rate);
+					slaveVideo.playbackRate = rate;
+				}
+				before = performance.now();
+				beforeVideo = masterVideo.currentTime;
+				interrupted = false;
+			}, 5000);
+			*/
 			document.getElementById("playback-rate-form").addEventListener("submit", function(e){
 				e.preventDefault();
-				setPlaybackRate(playbackRateInput.value);
+				let rate = playbackRateInput.value;
+				masterVideo.playbackRate = rate;
+				slaveVideo.playbackRate = rate;
 			});
 			document.getElementById("meta-controls-form").addEventListener("submit", function(e){
 				e.preventDefault();
-				leftVideo.src = leftInput.value;
-				rightVideo.src = rightInput.value;
+				masterVideo.src = masterInput.value;
+				slaveVideo.src = slaveInput.value;
 			});
 		</script>
 	</body>
